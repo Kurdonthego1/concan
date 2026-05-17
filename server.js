@@ -15,6 +15,11 @@ const PORT = process.env.PORT || 3000;
 // Serve static files from ./public
 app.use(express.static(path.join(__dirname, 'public')));
 
+// SPA fallback — let Vue Router handle all non-API routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // In-memory rooms map
 // Structure: Map<roomId, { id, hostId, gameState, settings, players }>
 // players: Map<socketId, { id, name, isHost }>
