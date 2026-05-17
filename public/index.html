@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Concan — Kurdish Rummy</title>
+  <link rel="stylesheet" href="/css/main.css" />
+</head>
+<body class="home-page">
+
+  <!-- Toast / error banner -->
+  <div id="toast" class="toast" role="alert" aria-live="assertive"></div>
+
+  <!-- Title -->
+  <h1 class="home-title">Concan</h1>
+  <p class="home-subtitle">Kurdish Rummy Card Game</p>
+
+  <!-- Create / Join panels -->
+  <div id="home-cards" class="home-cards">
+
+    <!-- Create Game panel -->
+    <div class="panel">
+      <h2>Create Game</h2>
+
+      <div class="form-group">
+        <label for="create-player-name">Your Name</label>
+        <input
+          type="text"
+          id="create-player-name"
+          placeholder="Enter your name"
+          maxlength="20"
+          autocomplete="off"
+        />
+      </div>
+
+      <div class="form-group">
+        <label>Options</label>
+
+        <label class="toggle-row">
+          <input type="checkbox" id="competitive-mode" />
+          <span class="toggle-label">Competitive Mode</span>
+          <span class="tooltip-icon">
+            ?
+            <span class="tooltip-text">
+              In competitive mode, scoring is stricter: penalty cards count
+              double, and you must declare before going out. Recommended for
+              experienced players.
+            </span>
+          </span>
+        </label>
+
+        <label class="toggle-row">
+          <input type="checkbox" id="team-mode" />
+          <span class="toggle-label">Team Mode (2v2)</span>
+        </label>
+      </div>
+
+      <button id="create-btn" class="btn btn-primary">Create Game</button>
+    </div>
+
+    <!-- Join Game panel -->
+    <div class="panel">
+      <h2>Join Game</h2>
+
+      <div class="form-group">
+        <label for="join-player-name">Your Name</label>
+        <input
+          type="text"
+          id="join-player-name"
+          placeholder="Enter your name"
+          maxlength="20"
+          autocomplete="off"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="join-room-code">Room Code</label>
+        <input
+          type="text"
+          id="join-room-code"
+          class="room-code-input"
+          placeholder="XXXXXX"
+          maxlength="6"
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </div>
+
+      <button id="join-btn" class="btn btn-primary">Join Game</button>
+    </div>
+
+  </div><!-- /.home-cards -->
+
+  <!-- Lobby section (hidden until create/join succeeds) -->
+  <div id="lobby-section" class="lobby-section" aria-live="polite">
+    <h2>Waiting Room</h2>
+
+    <p style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+      Share this code with friends:
+    </p>
+    <div id="lobby-room-code" class="room-code-display" title="Click to copy" role="button" tabindex="0">
+      ------
+    </div>
+
+    <ul id="lobby-player-list" class="player-list mt-2"></ul>
+
+    <p id="waiting-text" class="waiting-text">Waiting for players...</p>
+
+    <button id="start-btn" class="btn btn-primary hidden" style="max-width:200px; margin: 0 auto;">
+      Start Game
+    </button>
+  </div>
+
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="/js/home.js"></script>
+</body>
+</html>
