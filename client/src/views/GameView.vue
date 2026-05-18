@@ -86,12 +86,15 @@
 
         <!-- Action buttons -->
         <div v-if="state.turnPhase === 'act'" class="action-bar">
+          <span v-if="state.selectedIndices.size > 0" class="selection-value">
+            Selected: {{ selectedValue }} pts
+          </span>
           <button
             class="btn-action"
             :disabled="state.selectedIndices.size < 3"
             @click="onStageMeld"
           >
-            Stage Meld ({{ state.selectedIndices.size }} selected)
+            Stage Meld ({{ state.selectedIndices.size }} cards)
           </button>
           <button
             class="btn-action place-all"
@@ -125,7 +128,7 @@
           :key="card.id"
           :card="card"
           :selected="state.selectedIndices.has(i)"
-          :disabled="state.turnPhase !== 'act'"
+          :disabled="state.turnPhase !== 'act' || stagedIndices.value.has(i)"
           @click="toggleCard(i)"
         />
       </div>
@@ -188,6 +191,7 @@ function ownerName(ownerId) {
 
 function toggleCard(i) {
   if (state.turnPhase !== 'act') return
+  if (stagedIndices.value.has(i)) return
   if (state.selectedIndices.has(i)) state.selectedIndices.delete(i)
   else state.selectedIndices.add(i)
 }
@@ -205,6 +209,18 @@ function onDrawFromDiscard() {
 
 const SUIT_SYMBOLS = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠', joker: '🃏' }
 function suitSymbol(suit) { return SUIT_SYMBOLS[suit] || '' }
+
+function cardMeldValue(card) {
+  if (!card) return 0
+  const v = card.value
+  return (v >= 11 || v === 14 || card.suit === 'joker') ? 10 : v
+}
+
+const selectedValue = computed(() =>
+  [...state.selectedIndices].reduce((sum, i) => sum + cardMeldValue(state.myHand[i]), 0)
+)
+
+const stagedIndices = computed(() => new Set(state.pendingMelds.flatMap(m => m.indices)))
 
 const pendingMeldsValue = computed(() =>
   state.pendingMelds.reduce((sum, m) =>
@@ -396,7 +412,16 @@ function onExit() {
 .pending-value { color: var(--text-muted); margin-left: auto; }
 
 /* Action bar */
-.action-bar { display: flex; gap: 10px; flex-wrap: wrap; }
+.action-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.selection-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gold);
+  background: rgba(241,196,15,0.12);
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(241,196,15,0.3);
+}
 .btn-action {
   padding: 10px 20px;
   border-radius: 8px;
