@@ -128,18 +128,31 @@ export function useGame() {
       state.myHand = hand || []
       state.publicState = publicState || null
       checkMyTurn()
-      setPhase(state.isMyTurn ? 'draw' : 'wait')
+      if (state.isMyTurn) {
+        setPhase('draw')
+        socket.emit('draw-card', { fromDiscard: false }, (err) => {
+          if (err) showToast(err.error || 'Could not draw card.')
+        })
+      } else {
+        setPhase('wait')
+      }
       router.push('/game')
     })
 
-    socket.on('error', ({ message }) => {
-      showToast(message || 'An error occurred.')
-    })
-  }
+    socket.on('your-turn', ({ mustDraw }) => {
+      state.isMyTurn = true
+      addLog("It's your turn!", 'system')
+      showToast("It's your turn!", 'success')
 
-  function registerGameListeners() {
-    if (gameListenersRegistered) return
-    gameListenersRegistered = true
+      if (mustDraw !== false) {
+        setPhase('draw')
+        socket.emit('draw-card', { fromDiscard: false }, (err) => {
+          if (err) showToast(err.error || 'Could not draw card.')
+        })
+      } else {
+        setPhase('act')
+      }
+    })
 
     socket.on('state-update', ({ publicState }) => {
       state.publicState = publicState
@@ -163,21 +176,6 @@ export function useGame() {
       state.myHand = hand || []
     })
 
-    socket.on('your-turn', ({ mustDraw }) => {
-      state.isMyTurn = true
-      addLog("It's your turn!", 'system')
-      showToast("It's your turn!", 'success')
-
-      if (mustDraw !== false) {
-        setPhase('draw')
-        socket.emit('draw-card', { fromDiscard: false }, (err) => {
-          if (err) showToast(err.error || 'Could not draw card.')
-        })
-      } else {
-        setPhase('act')
-      }
-    })
-
     socket.on('game-ended', ({ scores, winnerName }) => {
       if (state.publicState) {
         state.publicState.phase = 'ended'
@@ -186,6 +184,14 @@ export function useGame() {
       }
       addLog(`Game over! ${winnerName} wins!`, 'system')
     })
+
+    socket.on('error', ({ message }) => {
+      showToast(message || 'An error occurred.')
+    })
+  }
+
+  function registerGameListeners() {
+    // All listeners are now registered in registerLobbyListeners
   }
 
   return {
