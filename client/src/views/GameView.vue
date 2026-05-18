@@ -69,14 +69,33 @@
           </div>
         </div>
 
+        <!-- Pending melds staging area -->
+        <div v-if="state.pendingMelds.length" class="pending-melds">
+          <span class="pending-label">Staged melds:</span>
+          <div v-for="(m, i) in state.pendingMelds" :key="i" class="pending-meld">
+            <span v-for="c in m.cards" :key="c.id" class="pending-card">
+              {{ c.display }}{{ suitSymbol(c.suit) }}
+            </span>
+            <button class="remove-btn" @click="removePendingMeld(i)">✕</button>
+          </div>
+          <span class="pending-value">Total: {{ pendingMeldsValue }} pts</span>
+        </div>
+
         <!-- Action buttons -->
         <div v-if="state.turnPhase === 'act'" class="action-bar">
           <button
             class="btn-action"
             :disabled="state.selectedIndices.size < 3"
-            @click="onPlaceMeld"
+            @click="onStageMeld"
           >
-            Place Meld ({{ state.selectedIndices.size }} selected)
+            Stage Meld ({{ state.selectedIndices.size }} selected)
+          </button>
+          <button
+            class="btn-action place-all"
+            :disabled="state.pendingMelds.length === 0"
+            @click="onPlaceAllMelds"
+          >
+            Place All ({{ state.pendingMelds.length }} meld{{ state.pendingMelds.length !== 1 ? 's' : '' }})
           </button>
           <button
             class="btn-action discard"
@@ -181,10 +200,39 @@ function onDrawFromDiscard() {
   drawCard(true)
 }
 
-function onPlaceMeld() {
+const SUIT_SYMBOLS = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠', joker: '🃏' }
+function suitSymbol(suit) { return SUIT_SYMBOLS[suit] || '' }
+
+const pendingMeldsValue = computed(() =>
+  state.pendingMelds.reduce((sum, m) =>
+    sum + m.cards.reduce((s, c) => {
+      const v = c.value
+      return s + (v >= 11 || v === 14 || c.suit === 'joker' ? 10 : v)
+    }, 0)
+  , 0)
+)
+
+function onStageMeld() {
   if (state.selectedIndices.size < 3) return
   const indices = [...state.selectedIndices].sort((a, b) => a - b)
-  placeMelds([indices], [null])
+  const cards = indices.map(i => state.myHand[i])
+  state.pendingMelds.push({ indices, cards })
+  state.selectedIndices.clear()
+}
+
+function removePendingMeld(i) {
+  state.pendingMelds.splice(i, 1)
+}
+
+function onPlaceAllMelds() {
+  if (!state.pendingMelds.length) return
+  const cardIndices = state.pendingMelds.map(m => m.indices)
+  const meldIds = state.pendingMelds.map(() => null)
+
+  // Adjust indices: after each meld is placed, remaining hand indices shift
+  // Server handles this with the original hand, so send as-is
+  placeMelds(cardIndices, meldIds)
+  state.pendingMelds = []
   state.selectedIndices.clear()
 }
 
@@ -292,8 +340,36 @@ function goHome() {
 }
 .no-melds { color: var(--text-muted); font-size: 13px; align-self: center; margin: auto; }
 
+/* Pending melds */
+.pending-melds {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(241,196,15,0.1);
+  border: 1px solid rgba(241,196,15,0.3);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.pending-label { color: var(--gold); font-weight: 600; }
+.pending-meld {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0,0,0,0.25);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.pending-card { font-family: 'Georgia', serif; }
+.remove-btn {
+  background: none; border: none; color: #e74c3c;
+  cursor: pointer; font-size: 11px; padding: 0 2px;
+}
+.pending-value { color: var(--text-muted); margin-left: auto; }
+
 /* Action bar */
-.action-bar { display: flex; gap: 10px; }
+.action-bar { display: flex; gap: 10px; flex-wrap: wrap; }
 .btn-action {
   padding: 10px 20px;
   border-radius: 8px;
@@ -309,6 +385,8 @@ function goHome() {
 .btn-action:disabled { opacity: 0.4; cursor: default; }
 .btn-action.discard { background: #c0392b; color: #fff; }
 .btn-action.discard:hover:not(:disabled) { background: #e74c3c; }
+.btn-action.place-all { background: #27ae60; color: #fff; }
+.btn-action.place-all:hover:not(:disabled) { background: #2ecc71; }
 
 /* Hand area */
 .hand-area {

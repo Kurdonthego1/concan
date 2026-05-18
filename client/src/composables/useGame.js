@@ -11,6 +11,7 @@ const state = reactive({
   isMyTurn: false,
   turnPhase: 'wait',
   selectedIndices: new Set(),
+  pendingMelds: [],
   gameLog: [],
   toast: { visible: false, message: '', type: 'error' },
 })
@@ -125,7 +126,12 @@ export function useGame() {
 
     socket.on('state-update', ({ publicState }) => {
       state.publicState = publicState
+      const wasMyTurn = state.isMyTurn
       checkMyTurn()
+      if (!state.isMyTurn && wasMyTurn) {
+        state.pendingMelds = []
+        state.selectedIndices.clear()
+      }
       if (state.isMyTurn) {
         if (publicState.turnPhase === 'act' && state.turnPhase === 'draw') {
           setPhase('act')
