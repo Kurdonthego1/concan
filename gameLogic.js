@@ -46,8 +46,7 @@ const dealCards = (deck, playerCount) => {
   const hands = [];
 
   for (let i = 0; i < playerCount; i++) {
-    const count = i === 0 ? 15 : 14;
-    hands.push(workingDeck.splice(0, count));
+    hands.push(workingDeck.splice(0, 14));
   }
 
   const drawnCard = workingDeck.shift();
