@@ -69,6 +69,7 @@
       <button v-if="state.isHost && state.lobbyPlayers.length >= 2" class="btn primary" @click="onStart">
         Start Game
       </button>
+      <button class="btn leave" @click="onLeave">Leave Lobby</button>
     </div>
   </div>
 </template>
@@ -79,7 +80,7 @@ import { useRouter } from 'vue-router'
 import { useGame } from '../composables/useGame.js'
 
 const router = useRouter()
-const { state, createRoom, joinRoom, startGame, registerLobbyListeners } = useGame()
+const { state, createRoom, joinRoom, startGame, registerLobbyListeners, leaveRoom } = useGame()
 
 const createName = ref('')
 const joinName = ref('')
@@ -116,6 +117,10 @@ async function onJoin() {
 
 function onStart() {
   startGame()
+}
+
+function onLeave() {
+  leaveRoom()
 }
 
 function copyCode() {
@@ -284,4 +289,6 @@ input:focus { border-color: var(--gold); }
   font-weight: 700;
 }
 .waiting-text { color: var(--text-muted); font-size: 14px; }
+.btn.leave { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: var(--text-muted); }
+.btn.leave:hover { border-color: #e74c3c; color: #e74c3c; }
 </style>

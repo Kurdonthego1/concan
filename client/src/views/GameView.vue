@@ -1,11 +1,14 @@
 <template>
   <div class="game-view">
     <!-- Top bar -->
-    <PlayerBar
-      :players="state.publicState?.players || []"
-      :currentPlayerIndex="state.publicState?.currentPlayerIndex ?? 0"
-      :myPlayerId="state.myPlayerId"
-    />
+    <div class="top-bar">
+      <PlayerBar
+        :players="state.publicState?.players || []"
+        :currentPlayerIndex="state.publicState?.currentPlayerIndex ?? 0"
+        :myPlayerId="state.myPlayerId"
+      />
+      <button class="exit-btn" @click="onExit">✕ Leave</button>
+    </div>
 
     <!-- Main area -->
     <div class="game-body">
@@ -149,7 +152,7 @@ import GameLog from '../components/GameLog.vue'
 import GameOver from '../components/GameOver.vue'
 
 const router = useRouter()
-const { state, drawCard, placeMelds, discardCard, registerGameListeners, rejoinRoom } = useGame()
+const { state, drawCard, placeMelds, discardCard, registerGameListeners, rejoinRoom, leaveRoom } = useGame()
 
 registerGameListeners()
 
@@ -253,6 +256,13 @@ function onExtendMeld(meldId) {
 function goHome() {
   router.push('/')
 }
+
+function onExit() {
+  if (confirm('Leave the game? You will be removed from the room.')) {
+    leaveRoom()
+    router.push('/')
+  }
+}
 </script>
 
 <style scoped>
@@ -262,6 +272,23 @@ function goHome() {
   height: 100vh;
   overflow: hidden;
 }
+
+.top-bar {
+  display: flex;
+  align-items: stretch;
+}
+.exit-btn {
+  background: transparent;
+  border: none;
+  border-left: 1px solid rgba(255,255,255,0.08);
+  color: var(--text-muted);
+  padding: 0 16px;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.exit-btn:hover { background: rgba(231,76,60,0.15); color: #e74c3c; }
 
 .game-body {
   display: grid;

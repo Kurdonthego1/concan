@@ -99,6 +99,23 @@ export function useGame() {
     })
   }
 
+  function leaveRoom() {
+    socket.disconnect()
+    socket.connect()
+    state.roomId = null
+    state.isHost = false
+    state.lobbyPlayers = []
+    state.myHand = []
+    state.publicState = null
+    state.isMyTurn = false
+    state.turnPhase = 'wait'
+    state.selectedIndices.clear()
+    state.pendingMelds = []
+    state.gameLog = []
+    lobbyListenersRegistered = false
+    gameListenersRegistered = false
+  }
+
   function registerLobbyListeners(router) {
     if (lobbyListenersRegistered) return
     lobbyListenersRegistered = true
@@ -178,5 +195,6 @@ export function useGame() {
     rejoinRoom,
     registerLobbyListeners,
     registerGameListeners,
+    leaveRoom,
   }
 }
