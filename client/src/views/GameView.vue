@@ -25,12 +25,9 @@
 
         <!-- Piles row -->
         <div class="piles-row">
-          <!-- Draw pile -->
+          <!-- Draw pile (auto-draws, display only) -->
           <div class="pile-block">
-            <div
-              :class="['pile', 'draw-pile', { clickable: state.isMyTurn && state.turnPhase === 'draw' }]"
-              @click="onDrawFromDeck"
-            >
+            <div class="pile draw-pile">
               <CardComponent
                 v-if="(state.publicState?.deckSize ?? 0) > 0"
                 :card="{ id:'back', suit:'spades', value:2, display:'', isWild:false }"
@@ -38,7 +35,7 @@
               />
               <div v-else class="empty-pile">Empty</div>
             </div>
-            <div class="pile-label">Draw Pile</div>
+            <div class="pile-label">Draw Pile (auto)</div>
           </div>
 
           <!-- Discard pile -->

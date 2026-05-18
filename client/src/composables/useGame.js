@@ -165,9 +165,17 @@ export function useGame() {
 
     socket.on('your-turn', ({ mustDraw }) => {
       state.isMyTurn = true
-      setPhase(mustDraw !== false ? 'draw' : 'act')
       addLog("It's your turn!", 'system')
       showToast("It's your turn!", 'success')
+
+      if (mustDraw !== false) {
+        setPhase('draw')
+        socket.emit('draw-card', { fromDiscard: false }, (err) => {
+          if (err) showToast(err.error || 'Could not draw card.')
+        })
+      } else {
+        setPhase('act')
+      }
     })
 
     socket.on('game-ended', ({ scores, winnerName }) => {
