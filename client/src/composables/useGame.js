@@ -128,14 +128,7 @@ export function useGame() {
       state.myHand = hand || []
       state.publicState = publicState || null
       checkMyTurn()
-      if (state.isMyTurn) {
-        setPhase('draw')
-        socket.emit('draw-card', { fromDiscard: false }, (err) => {
-          if (err) showToast(err.error || 'Could not draw card.')
-        })
-      } else {
-        setPhase('wait')
-      }
+      setPhase(state.isMyTurn ? 'draw' : 'wait')
       router.push('/game')
     })
 
@@ -143,15 +136,7 @@ export function useGame() {
       state.isMyTurn = true
       addLog("It's your turn!", 'system')
       showToast("It's your turn!", 'success')
-
-      if (mustDraw !== false) {
-        setPhase('draw')
-        socket.emit('draw-card', { fromDiscard: false }, (err) => {
-          if (err) showToast(err.error || 'Could not draw card.')
-        })
-      } else {
-        setPhase('act')
-      }
+      setPhase(mustDraw === false ? 'act' : 'draw')
     })
 
     socket.on('state-update', ({ publicState }) => {

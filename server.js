@@ -263,6 +263,8 @@ io.on('connection', (socket) => {
       return cb({ error: err.message || 'Failed to draw card.' });
     }
 
+    if (result.error) return cb({ error: result.error });
+
     room.gameState = result.state || state;
 
     cb(null, { card: result.card });
@@ -313,6 +315,7 @@ io.on('connection', (socket) => {
 
     room.gameState = result.state || state;
 
+    if (result.error) return cb({ error: result.error });
     cb(null, {});
 
     // Send updated hand to acting player
@@ -321,11 +324,14 @@ io.on('connection', (socket) => {
       socket.emit('hand-update', { hand: updatedPlayer.hand });
     }
 
-    // Check for win
-    if (result.win) {
+    // Check for win (player emptied their hand via meld placement)
+    if (room.gameState.phase === 'ended' && room.gameState.winnerId) {
+      const winner = room.gameState.players.find(p => p.id === room.gameState.winnerId);
+      const scores = gameLogic.calculateScores(room.gameState.players, room.gameState.winnerId);
+      room.gameState.winnerName = winner ? winner.name : 'Unknown';
       io.to(room.id).emit('game-ended', {
-        scores: result.scores,
-        winnerName: result.winnerName,
+        scores,
+        winnerName: room.gameState.winnerName,
       });
       return;
     }
@@ -370,19 +376,23 @@ io.on('connection', (socket) => {
 
     room.gameState = result.state || state;
 
+    if (result.error) return cb({ error: result.error });
     cb(null, {});
 
     // Always send updated hand to the player who discarded
-    const updatedPlayer = room.gameState.players.find(p => p.id === socket.id);
-    if (updatedPlayer) {
-      socket.emit('hand-update', { hand: updatedPlayer.hand });
+    const discardPlayer = room.gameState.players.find(p => p.id === socket.id);
+    if (discardPlayer) {
+      socket.emit('hand-update', { hand: discardPlayer.hand });
     }
 
     // Check for win
-    if (result.win) {
+    if (room.gameState.phase === 'ended' && room.gameState.winnerId) {
+      const winner = room.gameState.players.find(p => p.id === room.gameState.winnerId);
+      const scores = gameLogic.calculateScores(room.gameState.players, room.gameState.winnerId);
+      room.gameState.winnerName = winner ? winner.name : 'Unknown';
       io.to(room.id).emit('game-ended', {
-        scores: result.scores,
-        winnerName: result.winnerName,
+        scores,
+        winnerName: room.gameState.winnerName,
       });
       return;
     }

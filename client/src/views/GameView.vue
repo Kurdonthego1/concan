@@ -25,9 +25,12 @@
 
         <!-- Piles row -->
         <div class="piles-row">
-          <!-- Draw pile (auto-draws, display only) -->
+          <!-- Draw pile -->
           <div class="pile-block">
-            <div class="pile draw-pile">
+            <div
+              :class="['pile', 'draw-pile', { clickable: state.isMyTurn && state.turnPhase === 'draw' && (state.publicState?.deckSize ?? 0) > 0 }]"
+              @click="onDrawFromDeck"
+            >
               <CardComponent
                 v-if="(state.publicState?.deckSize ?? 0) > 0"
                 :card="{ id:'back', suit:'spades', value:2, display:'', isWild:false }"
@@ -35,7 +38,7 @@
               />
               <div v-else class="empty-pile">Empty</div>
             </div>
-            <div class="pile-label">Draw Pile (auto)</div>
+            <div class="pile-label">Draw Pile</div>
           </div>
 
           <!-- Discard pile -->
@@ -71,34 +74,49 @@
 
         <!-- Pending melds staging area -->
         <div v-if="state.pendingMelds.length" class="pending-melds">
-          <span class="pending-label">Staged melds:</span>
-          <div v-for="(m, i) in state.pendingMelds" :key="i" class="pending-meld">
-            <span v-for="c in m.cards" :key="c.id" class="pending-card">
-              {{ c.display }}{{ suitSymbol(c.suit) }}
-            </span>
-            <button class="remove-btn" @click="removePendingMeld(i)">✕</button>
+          <div class="pending-header">
+            <span class="pending-label">Staged Melds</span>
+            <span class="pending-value">Total: {{ pendingMeldsValue }} pts</span>
           </div>
-          <span class="pending-value">Total: {{ pendingMeldsValue }} pts</span>
+          <div class="pending-meld-list">
+            <div v-for="(m, i) in state.pendingMelds" :key="i" class="pending-meld">
+              <div class="pending-meld-cards">
+                <CardComponent
+                  v-for="c in m.cards"
+                  :key="c.id"
+                  :card="c"
+                  :small="true"
+                />
+              </div>
+              <div class="pending-meld-info">
+                <span class="pending-meld-value">{{ meldValue(m.cards) }} pts</span>
+                <button class="remove-btn" @click="removePendingMeld(i)">✕ Remove</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Action buttons -->
         <div v-if="state.turnPhase === 'act'" class="action-bar">
-          <span v-if="state.selectedIndices.size > 0" class="selection-value">
-            Selected: {{ selectedValue }} pts
+          <span v-if="!myPlayer?.hasOpened && state.selectedIndices.size > 0" class="selection-value">
+            Selected: {{ selectedValue }} pts {{ pendingMeldsValue + selectedValue >= 51 ? '✓' : `(need ${51 - pendingMeldsValue - selectedValue} more)` }}
+          </span>
+          <span v-else-if="state.selectedIndices.size > 0" class="selection-value">
+            Selected: {{ state.selectedIndices.size }} card{{ state.selectedIndices.size !== 1 ? 's' : '' }}
           </span>
           <button
             class="btn-action"
             :disabled="state.selectedIndices.size < 3"
             @click="onStageMeld"
           >
-            Stage Meld ({{ state.selectedIndices.size }} cards)
+            Stage 1 Meld ({{ state.selectedIndices.size }} cards)
           </button>
           <button
             class="btn-action place-all"
             :disabled="state.pendingMelds.length === 0"
             @click="onPlaceAllMelds"
           >
-            Place All ({{ state.pendingMelds.length }} meld{{ state.pendingMelds.length !== 1 ? 's' : '' }})
+            Place {{ state.pendingMelds.length }} Meld{{ state.pendingMelds.length !== 1 ? 's' : '' }} {{ !myPlayer?.hasOpened ? `(${pendingMeldsValue} pts)` : '' }}
           </button>
           <button
             class="btn-action discard"
@@ -118,16 +136,32 @@
 
     <!-- Hand -->
     <div class="hand-area">
-      <div class="hand-label">Your Hand ({{ state.myHand.length }} cards)</div>
+      <div class="hand-header">
+        <div class="hand-label">Your Hand ({{ state.myHand.length }} cards)</div>
+        <button class="mode-toggle" @click="handMode = handMode === 'select' ? 'reorder' : 'select'">
+          {{ handMode === 'select' ? '🔀 Reorder' : '👆 Select' }}
+        </button>
+      </div>
       <div class="hand-cards">
-        <CardComponent
+        <div
           v-for="(card, i) in state.myHand"
           :key="card.id"
-          :card="card"
-          :selected="state.selectedIndices.has(i)"
-          :disabled="state.turnPhase !== 'act' || stagedIndices.value.has(i)"
-          @click="toggleCard(i)"
-        />
+          class="hand-slot"
+          :class="{ 'drag-over': handMode === 'reorder' && dragOverIndex === i, 'staged': stagedIndices.has(i) }"
+          :draggable="handMode === 'reorder'"
+          @dragstart="onDragStart(i, $event)"
+          @dragover.prevent="onDragOver(i)"
+          @dragleave="onDragLeave"
+          @drop.prevent="onDrop(i)"
+          @dragend="onDragEnd"
+          @click="onCardClick(i)"
+        >
+          <CardComponent
+            :card="card"
+            :selected="state.selectedIndices.has(i)"
+            :disabled="cardDisabled(i)"
+          />
+        </div>
       </div>
     </div>
 
@@ -142,7 +176,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGame } from '../composables/useGame.js'
 import CardComponent from '../components/CardComponent.vue'
@@ -152,7 +186,7 @@ import GameLog from '../components/GameLog.vue'
 import GameOver from '../components/GameOver.vue'
 
 const router = useRouter()
-const { state, drawCard, placeMelds, discardCard, registerGameListeners, rejoinRoom, leaveRoom } = useGame()
+const { state, showToast, drawCard, placeMelds, discardCard, registerGameListeners, rejoinRoom, leaveRoom } = useGame()
 
 registerGameListeners()
 
@@ -175,18 +209,30 @@ const jokerText = computed(() => {
   return `Ace of ${ji.jokerSuit} is wild`
 })
 
+const myPlayer = computed(() =>
+  state.publicState?.players?.find(p => p.id === state.myPlayerId)
+)
+
 const canExtendMeld = computed(() =>
   state.isMyTurn &&
   state.turnPhase === 'act' &&
   state.selectedIndices.size >= 1 &&
-  !!(state.publicState?.players?.find(p => p.id === state.myPlayerId)?.hasOpened)
+  !!myPlayer.value?.hasOpened
 )
 
 function ownerName(ownerId) {
   return state.publicState?.players?.find(p => p.id === ownerId)?.name || ''
 }
 
-function toggleCard(i) {
+function cardDisabled(i) {
+  if (handMode.value === 'reorder') return true
+  if (state.turnPhase !== 'act') return true
+  if (stagedIndices.value.has(i)) return true
+  return false
+}
+
+function onCardClick(i) {
+  if (handMode.value !== 'select') return
   if (state.turnPhase !== 'act') return
   if (stagedIndices.value.has(i)) return
   if (state.selectedIndices.has(i)) state.selectedIndices.delete(i)
@@ -213,6 +259,10 @@ function cardMeldValue(card) {
   return (v >= 11 || v === 14 || card.suit === 'joker') ? 10 : v
 }
 
+function meldValue(cards) {
+  return cards.reduce((sum, c) => sum + cardMeldValue(c), 0)
+}
+
 const selectedValue = computed(() =>
   [...state.selectedIndices].reduce((sum, i) => sum + cardMeldValue(state.myHand[i]), 0)
 )
@@ -228,10 +278,58 @@ const pendingMeldsValue = computed(() =>
   , 0)
 )
 
+function isValidSetClient(cards) {
+  const nonWilds = cards.filter(c => !c.isWild)
+  if (nonWilds.length < 2) return false
+  const rank = nonWilds[0].value
+  if (!nonWilds.every(c => c.value === rank)) return false
+  const suits = nonWilds.map(c => c.suit)
+  if (new Set(suits).size !== suits.length) return false
+  return true
+}
+
+function isValidRunClient(cards) {
+  const nonWilds = cards.filter(c => !c.isWild)
+  const wildCount = cards.length - nonWilds.length
+  if (nonWilds.length < 2) return false
+  const suit = nonWilds[0].suit
+  if (!nonWilds.every(c => c.suit === suit)) return false
+  const tryRun = (values) => {
+    const sorted = [...values].sort((a, b) => a - b)
+    const range = sorted[sorted.length - 1] - sorted[0] + 1
+    if (range > cards.length) return false
+    if (range - sorted.length > wildCount) return false
+    if (new Set(sorted).size !== sorted.length) return false
+    return true
+  }
+  const vals = nonWilds.map(c => c.value)
+  if (tryRun(vals)) return true
+  if (vals.includes(14) && tryRun(vals.map(v => v === 14 ? 1 : v))) return true
+  return false
+}
+
+function isValidMeldClient(cards) {
+  if (cards.length < 3) return false
+  return isValidSetClient(cards) || isValidRunClient(cards)
+}
+
+function markWilds(cards) {
+  const ji = state.publicState?.jokerInfo
+  if (!ji) return cards
+  return cards.map(c => ({
+    ...c,
+    isWild: c.suit === 'joker' || (ji.specialAceActive && c.suit === ji.jokerSuit && c.value === 14),
+  }))
+}
+
 function onStageMeld() {
   if (state.selectedIndices.size < 3) return
   const indices = [...state.selectedIndices].sort((a, b) => a - b)
-  const cards = indices.map(i => state.myHand[i])
+  const cards = markWilds(indices.map(i => state.myHand[i]))
+  if (!isValidMeldClient(cards)) {
+    showToast('Invalid meld — stage one meld at a time (e.g. select 3 cards, stage, then select the next 3)')
+    return
+  }
   state.pendingMelds.push({ indices, cards })
   state.selectedIndices.clear()
 }
@@ -264,6 +362,42 @@ function onExtendMeld(meldId) {
   const indices = [...state.selectedIndices].sort((a, b) => a - b)
   placeMelds([indices], [meldId])
   state.selectedIndices.clear()
+}
+
+const handMode = ref('select')
+const dragFromIndex = ref(null)
+const dragOverIndex = ref(null)
+
+function onDragStart(i, e) {
+  if (handMode.value !== 'reorder') return
+  dragFromIndex.value = i
+  e.dataTransfer.effectAllowed = 'move'
+}
+
+function onDragOver(i) {
+  if (handMode.value !== 'reorder') return
+  dragOverIndex.value = i
+}
+
+function onDragLeave() {
+  dragOverIndex.value = null
+}
+
+function onDrop(i) {
+  if (handMode.value !== 'reorder') return
+  const from = dragFromIndex.value
+  if (from === null || from === i) return
+  const card = state.myHand.splice(from, 1)[0]
+  state.myHand.splice(i, 0, card)
+  state.selectedIndices.clear()
+  state.pendingMelds = []
+  dragOverIndex.value = null
+  dragFromIndex.value = null
+}
+
+function onDragEnd() {
+  dragOverIndex.value = null
+  dragFromIndex.value = null
 }
 
 function goHome() {
@@ -382,31 +516,41 @@ function onExit() {
 
 /* Pending melds */
 .pending-melds {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px 12px;
-  background: rgba(241,196,15,0.1);
-  border: 1px solid rgba(241,196,15,0.3);
-  border-radius: 8px;
-  font-size: 13px;
+  background: rgba(52,152,219,0.1);
+  border: 2px solid rgba(52,152,219,0.5);
+  border-radius: 10px;
+  padding: 12px;
 }
-.pending-label { color: var(--gold); font-weight: 600; }
+.pending-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.pending-label { color: #3498db; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; }
+.pending-value { color: var(--text-muted); font-size: 13px; font-weight: 600; }
+.pending-meld-list { display: flex; flex-wrap: wrap; gap: 12px; }
 .pending-meld {
+  background: rgba(0,0,0,0.2);
+  border: 1px solid rgba(52,152,219,0.3);
+  border-radius: 8px;
+  padding: 8px;
   display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pending-meld-cards { display: flex; gap: 4px; }
+.pending-meld-info {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 4px;
-  background: rgba(0,0,0,0.25);
-  padding: 3px 8px;
-  border-radius: 6px;
 }
-.pending-card { font-family: 'Georgia', serif; }
+.pending-meld-value { font-size: 11px; color: #3498db; font-weight: 600; }
 .remove-btn {
-  background: none; border: none; color: #e74c3c;
-  cursor: pointer; font-size: 11px; padding: 0 2px;
+  background: none; border: 1px solid rgba(231,76,60,0.4); color: #e74c3c;
+  cursor: pointer; font-size: 11px; padding: 2px 8px; border-radius: 4px;
 }
-.pending-value { color: var(--text-muted); margin-left: auto; }
+.remove-btn:hover { background: rgba(231,76,60,0.15); }
 
 /* Action bar */
 .action-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -442,18 +586,52 @@ function onExit() {
   border-top: 1px solid rgba(255,255,255,0.08);
   background: rgba(0,0,0,0.25);
   padding: 12px 16px;
+  overflow-y: auto;
+  max-height: 40vh;
+}
+.hand-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
 .hand-label {
   font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  margin-bottom: 8px;
+}
+.mode-toggle {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: var(--text);
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.mode-toggle:hover {
+  background: rgba(255,255,255,0.18);
+  border-color: var(--gold);
 }
 .hand-cards {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
-  overflow-x: auto;
   padding-bottom: 4px;
+}
+.hand-slot {
+  flex-shrink: 0;
+  transition: transform 0.15s, opacity 0.15s;
+}
+.hand-slot.drag-over {
+  transform: translateX(10px);
+  border-left: 3px solid var(--gold);
+}
+.hand-slot.staged {
+  opacity: 0.35;
+  pointer-events: none;
+  filter: saturate(0.3);
 }
 </style>
