@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/Zkurdi/Desktop/Coding Project/concan/**)",
+      "Bash(npm run *)"
+    ]
+  }
+}
