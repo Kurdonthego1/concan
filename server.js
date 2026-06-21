@@ -2,6 +2,7 @@
 
 const express = require('express');
 const http = require('http');
+const fs = require('fs');
 const { Server } = require('socket.io');
 const path = require('path');
 const gameLogic = require('./gameLogic');
@@ -12,12 +13,29 @@ const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 
-// Serve static files from ./public
-app.use(express.static(path.join(__dirname, 'public')));
+const publicDir = path.join(__dirname, 'public');
 
-// SPA fallback — let Vue Router handle all non-API routes
+// Log public directory state on startup
+console.log('[startup] public/ exists:', fs.existsSync(publicDir));
+if (fs.existsSync(publicDir)) {
+  console.log('[startup] public/ contents:', fs.readdirSync(publicDir));
+  const assetsDir = path.join(publicDir, 'assets');
+  if (fs.existsSync(assetsDir)) {
+    console.log('[startup] public/assets/ contents:', fs.readdirSync(assetsDir));
+  }
+}
+
+// Serve static files from ./public
+app.use(express.static(publicDir));
+
+// SPA fallback — only for non-asset routes (let Vue Router handle page navigation)
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  const indexPath = path.join(publicDir, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(500).send('Build files not found. Redeploy needed.');
+  }
 });
 
 // In-memory rooms map
